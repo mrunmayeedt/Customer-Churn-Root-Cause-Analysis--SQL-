@@ -1,5 +1,5 @@
 - ============================================================
--- STEP 5: Build the normalized schema
+-- STEP 5: Building the normalized schema
 -- ============================================================
 
 DROP TABLE IF EXISTS churn_events CASCADE;
@@ -60,11 +60,8 @@ CREATE TABLE churn_events (
 );
 SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';
 
-
--- ============================================================
--- STEP 6: Populate normalized tables from staging
--- (order matters — customers first, since the others FK into it)
--- ============================================================
+/* Populate normalized tables from staging,
+    (order matters — customers first, since the others FK into it) */
 ALTER TABLE customers ALTER COLUMN gender TYPE VARCHAR(20); -- earlier gave error as value too long for type character varying(10), so fixing by altering table
 
 INSERT INTO customers (customer_id, phone_number, gender, age, under_30,
@@ -82,8 +79,8 @@ SELECT
 FROM staging_churn;
 
 INSERT INTO accounts (customer_id, account_length_months, contract_type,
-                       payment_method, monthly_charge, total_charges,
-                       unlimited_data_plan, device_protection_backup)
+    payment_method, monthly_charge, total_charges,
+    unlimited_data_plan, device_protection_backup)
 SELECT
     customer_id,
     NULLIF(account_length_months, '')::SMALLINT,

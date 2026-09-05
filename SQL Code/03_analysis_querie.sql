@@ -1,14 +1,10 @@
--- ============================================================
--- Customer Churn Root-Cause Analysis (SQL)
+/* Customer Churn Root-Cause Analysis (SQL)
 -- 03_analysis_queries.sql
 -- Core business queries + window functions, run after
--- 02_normalize_schema.sql and dropping staging_churn.
--- ============================================================
+-- 02_normalize_schema.sql and dropping staging_churn. */
 
 
--- ============================================================
 -- SECTION 1: Baseline — overall churn rate
--- ============================================================
 
 SELECT
     SUM(CASE WHEN churn_label THEN 1 ELSE 0 END) AS churned,
@@ -19,10 +15,8 @@ SELECT
 FROM churn_events;
 
 
--- ============================================================
 -- SECTION 2: Churn rate by contract type
 -- Hypothesis from earlier: Month-to-Month drives most churn
--- ============================================================
 
 SELECT
     a.contract_type,
@@ -37,9 +31,7 @@ GROUP BY a.contract_type
 ORDER BY churn_rate_pct DESC;
 
 
--- ============================================================
 -- SECTION 3: Churn rate by payment method
--- ============================================================
 
 SELECT
     a.payment_method,
@@ -54,11 +46,9 @@ GROUP BY a.payment_method
 ORDER BY churn_rate_pct DESC;
 
 
--- ============================================================
 -- SECTION 4: Churn rate by contract type AND device protection
 -- This is the interaction that tests the specific root-cause
 -- hypothesis: M2M + no protection is the highest-risk segment
--- ============================================================
 
 SELECT
     a.contract_type,
@@ -74,10 +64,8 @@ GROUP BY a.contract_type, a.device_protection_backup
 ORDER BY churn_rate_pct DESC;
 
 
--- ============================================================
 -- SECTION 5: Why are they leaving? Churn category breakdown
 -- (only churned customers have a category — WHERE excludes NULLs)
--- ============================================================
 
 SELECT
     churn_category,
@@ -89,11 +77,9 @@ GROUP BY churn_category
 ORDER BY churned_customers DESC;
 
 
--- ============================================================
 -- SECTION 6: Does churn category differ by contract type?
 -- e.g. do M2M customers leave for Price while Two-Year leave
 -- for Competitor — different causes need different fixes
--- ============================================================
 
 SELECT
     a.contract_type,
@@ -106,10 +92,8 @@ GROUP BY a.contract_type, ch.churn_category
 ORDER BY a.contract_type, churned_customers DESC;
 
 
--- ============================================================
 -- SECTION 7: Revenue at risk — monthly charge exposure among
 -- customers who HAVEN'T churned yet, by risk segment
--- ============================================================
 
 SELECT
     a.contract_type,
@@ -123,10 +107,8 @@ GROUP BY a.contract_type, a.device_protection_backup
 ORDER BY monthly_revenue_at_risk DESC;
 
 
--- ============================================================
 -- SECTION 8: Customer service calls vs churn
 -- A classic churn signal — more support calls, more frustration
--- ============================================================
 
 SELECT
     ch.churn_label,
@@ -136,15 +118,13 @@ JOIN churn_events ch USING (customer_id)
 GROUP BY ch.churn_label;
 
 
--- ============================================================
 -- SECTION 9 (window functions): Rank states by churn rate
--- ============================================================
 
 WITH state_churn AS (
     SELECT
         c.state,
-        COUNT(*)                                            AS customers,
-        SUM(CASE WHEN ch.churn_label THEN 1 ELSE 0 END)     AS churned,
+        COUNT(*)AS customers,
+        SUM(CASE WHEN ch.churn_label THEN 1 ELSE 0 END)AS churned,
         ROUND(
             100.0 * SUM(CASE WHEN ch.churn_label THEN 1 ELSE 0 END) / COUNT(*), 1
         ) AS churn_rate_pct
@@ -163,10 +143,8 @@ ORDER BY churn_rank
 LIMIT 10;
 
 
--- ============================================================
 -- SECTION 10 (window functions): Monthly charge quartiles vs
 -- churn rate — are you losing your highest-value customers?
--- ============================================================
 
 WITH charge_quartiles AS (
     SELECT
@@ -179,9 +157,9 @@ WITH charge_quartiles AS (
 )
 SELECT
     charge_quartile,
-    COUNT(*)                                              AS customers,
-    ROUND(MIN(monthly_charge), 2)                         AS min_charge,
-    ROUND(MAX(monthly_charge), 2)                         AS max_charge,
+    COUNT(*)AS customers,
+    ROUND(MIN(monthly_charge), 2)AS min_charge,
+    ROUND(MAX(monthly_charge), 2)AS max_charge,
     ROUND(
         100.0 * SUM(CASE WHEN churn_label THEN 1 ELSE 0 END) / COUNT(*), 1
     ) AS churn_rate_pct
@@ -190,10 +168,8 @@ GROUP BY charge_quartile
 ORDER BY charge_quartile;
 
 
--- ============================================================
 -- SECTION 11 (window functions): Cumulative churn by tenure —
 -- at what point in the customer lifecycle does risk peak?
--- ============================================================
 
 WITH tenure_churn AS (
     SELECT
@@ -214,18 +190,16 @@ FROM tenure_churn
 ORDER BY account_length_months;
 
 
--- ============================================================
 -- SECTION 12: Root-cause synthesis view
 -- The single reusable object your README's headline finding
 -- should be pulled from — turn this into CREATE VIEW once
 -- you've confirmed which segment is the real driver above.
--- ============================================================
 
 CREATE VIEW high_risk_segment_summary AS
 SELECT
     a.contract_type,
     a.payment_method,
-    COUNT(*)                                              AS customers,
+    COUNT(*)AS customers,
     ROUND(
         100.0 * SUM(CASE WHEN ch.churn_label THEN 1 ELSE 0 END) / COUNT(*), 1
     ) AS churn_rate_pct,
